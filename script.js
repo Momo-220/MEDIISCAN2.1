@@ -56,32 +56,92 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function startCamera() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            camera.srcObject = stream;
-            camera.hidden = false;
-            camera.play();
+            // Configuration optimisée pour mobile
+            const constraints = {
+                video: {
+                    facingMode: { exact: "environment" }, // Force la caméra arrière
+                    width: { ideal: 1920, max: 2560 },
+                    height: { ideal: 1080, max: 1440 },
+                    frameRate: { ideal: 30, max: 60 }, // Améliore la fluidité
+                    aspectRatio: { ideal: 16/9 },
+                    focusMode: "continuous", // Auto-focus continu
+                    exposureMode: "continuous", // Exposition automatique
+                    whiteBalanceMode: "continuous"
+                }
+            };
 
+            // Configuration de fallback si la première échoue
+            const fallbackConstraints = {
+                video: {
+                    facingMode: "environment", // Version moins stricte
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    frameRate: { min: 24 }
+                }
+            };
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                camera.srcObject = stream;
+                camera.hidden = false;
+
+                // Optimisation des performances
+                camera.setAttribute('playsinline', true); // Évite le plein écran sur iOS
+                camera.setAttribute('autoplay', true);
+                camera.style.transform = 'scaleX(-1)'; // Correction du miroir
+                
+                await camera.play();
+
+                // Optimisation de la capture
+                camera.addEventListener('loadedmetadata', () => {
+                    const track = stream.getVideoTracks()[0];
+                    const capabilities = track.getCapabilities();
+                    
+                    // Appliquer les meilleurs paramètres disponibles
+                    if (capabilities.focusMode) {
+                        track.applyConstraints({
+                            advanced: [{ focusMode: "continuous" }]
+                        });
+                    }
+                });
+
+            } catch (err) {
+                console.log("Tentative avec configuration de fallback");
+                const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+                camera.srcObject = stream;
+                camera.hidden = false;
+                await camera.play();
+            }
+
+            // Optimisation de la capture d'image
             camera.addEventListener('loadeddata', () => {
                 const canvas = document.createElement('canvas');
                 canvas.width = camera.videoWidth;
                 canvas.height = camera.videoHeight;
-                canvas.getContext('2d').drawImage(camera, 0, 0);
                 
-                canvas.toBlob(async (blob) => {
-                    camera.hidden = true;
-                    preview.src = URL.createObjectURL(blob);
-                    imagePreview.hidden = false;
+                // Utilisation de requestAnimationFrame pour une meilleure performance
+                requestAnimationFrame(() => {
+                    canvas.getContext('2d').drawImage(camera, 0, 0);
                     
-                    const stream = camera.srcObject;
-                    stream.getTracks().forEach(track => track.stop());
-                    
-                    await analyzeMedication(blob);
-                }, 'image/jpeg');
+                    canvas.toBlob(async (blob) => {
+                        camera.hidden = true;
+                        preview.src = URL.createObjectURL(blob);
+                        imagePreview.hidden = false;
+                        
+                        // Arrêt propre de la caméra
+                        const stream = camera.srcObject;
+                        if (stream) {
+                            stream.getTracks().forEach(track => track.stop());
+                        }
+                        
+                        await analyzeMedication(blob);
+                    }, 'image/jpeg', 0.95); // Qualité d'image optimisée
+                });
             });
 
         } catch (err) {
-            console.error('Erreur lors de l\'accès à la caméra:', err);
-            alert('Impossible d\'accéder à la caméra');
+            console.error('Erreur d\'accès à la caméra:', err);
+            alert('Impossible d\'accéder à la caméra. Vérifiez les permissions et réessayez.');
         }
     }
 
