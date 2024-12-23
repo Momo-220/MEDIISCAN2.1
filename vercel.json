@@ -8,5 +8,20 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=self"
+        },
+        {
+          "key": "Feature-Policy",
+          "value": "camera 'self'"
+        }
+      ]
+    }
   ]
 } 

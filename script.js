@@ -1,16 +1,5 @@
 const API_KEY = 'AIzaSyD00fZSXDsQBx60juOZxBdgT--jQKVvpl0';
 
-// Configuration de sécurité
-const securityConfig = {
-    headers: {
-        'Content-Security-Policy': "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline'",
-        'X-Content-Type-Options': 'nosniff',
-        'X-Frame-Options': 'DENY',
-        'X-XSS-Protection': '1; mode=block',
-        'Referrer-Policy': 'strict-origin-when-cross-origin'
-    }
-};
-
 document.addEventListener('DOMContentLoaded', () => {
     const uploadBtn = document.getElementById('uploadBtn');
     const captureBtn = document.getElementById('captureBtn');
@@ -38,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return clean;
     }
 
-    // Modification de la fonction handleImageUpload
+    // Gestion de l'upload d'image
     async function handleImageUpload(e) {
         try {
             const file = e.target.files[0];
@@ -54,29 +43,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Gestion de la caméra
     async function startCamera() {
         try {
-            // Configuration optimisée pour mobile
             const constraints = {
                 video: {
-                    facingMode: { exact: "environment" }, // Force la caméra arrière
-                    width: { ideal: 1920, max: 2560 },
-                    height: { ideal: 1080, max: 1440 },
-                    frameRate: { ideal: 30, max: 60 }, // Améliore la fluidité
-                    aspectRatio: { ideal: 16/9 },
-                    focusMode: "continuous", // Auto-focus continu
-                    exposureMode: "continuous", // Exposition automatique
-                    whiteBalanceMode: "continuous"
+                    facingMode: { exact: "environment" },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
                 }
             };
 
-            // Configuration de fallback si la première échoue
             const fallbackConstraints = {
                 video: {
-                    facingMode: "environment", // Version moins stricte
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                    frameRate: { min: 24 }
+                    facingMode: "user",
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
                 }
             };
 
@@ -84,68 +66,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 camera.srcObject = stream;
                 camera.hidden = false;
-
-                // Optimisation des performances
-                camera.setAttribute('playsinline', true); // Évite le plein écran sur iOS
-                camera.setAttribute('autoplay', true);
-                camera.style.transform = 'scaleX(-1)'; // Correction du miroir
-                
                 await camera.play();
-
-                // Optimisation de la capture
-                camera.addEventListener('loadedmetadata', () => {
-                    const track = stream.getVideoTracks()[0];
-                    const capabilities = track.getCapabilities();
-                    
-                    // Appliquer les meilleurs paramètres disponibles
-                    if (capabilities.focusMode) {
-                        track.applyConstraints({
-                            advanced: [{ focusMode: "continuous" }]
-                        });
-                    }
-                });
-
             } catch (err) {
-                console.log("Tentative avec configuration de fallback");
+                console.log("Caméra arrière non disponible, utilisation de la caméra frontale");
                 const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
                 camera.srcObject = stream;
                 camera.hidden = false;
                 await camera.play();
             }
 
-            // Optimisation de la capture d'image
             camera.addEventListener('loadeddata', () => {
                 const canvas = document.createElement('canvas');
                 canvas.width = camera.videoWidth;
                 canvas.height = camera.videoHeight;
+                canvas.getContext('2d').drawImage(camera, 0, 0);
                 
-                // Utilisation de requestAnimationFrame pour une meilleure performance
-                requestAnimationFrame(() => {
-                    canvas.getContext('2d').drawImage(camera, 0, 0);
+                canvas.toBlob(async (blob) => {
+                    camera.hidden = true;
+                    preview.src = URL.createObjectURL(blob);
+                    imagePreview.hidden = false;
                     
-                    canvas.toBlob(async (blob) => {
-                        camera.hidden = true;
-                        preview.src = URL.createObjectURL(blob);
-                        imagePreview.hidden = false;
-                        
-                        // Arrêt propre de la caméra
-                        const stream = camera.srcObject;
-                        if (stream) {
-                            stream.getTracks().forEach(track => track.stop());
-                        }
-                        
-                        await analyzeMedication(blob);
-                    }, 'image/jpeg', 0.95); // Qualité d'image optimisée
-                });
+                    const stream = camera.srcObject;
+                    if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                    }
+                    
+                    await analyzeMedication(blob);
+                }, 'image/jpeg', 0.95);
             });
 
         } catch (err) {
-            console.error('Erreur d\'accès à la caméra:', err);
-            alert('Impossible d\'accéder à la caméra. Vérifiez les permissions et réessayez.');
+            console.error('Erreur lors de l\'accès à la caméra:', err);
+            alert('Impossible d\'accéder à la caméra. Vérifiez les permissions.');
         }
     }
 
-    // Modification de la fonction analyzeMedication
+    // Analyse du médicament
     async function analyzeMedication(imageFile) {
         try {
             const scanStatus = document.getElementById('scanStatus');
@@ -153,7 +109,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const generalInfo = document.getElementById('generalInfo');
             const medicalInfo = document.getElementById('medicalInfo');
             
-            // Réinitialiser l'affichage
             scanStatus.hidden = false;
             resultTable.hidden = true;
             statusMessage.textContent = 'Scan en cours';
@@ -216,7 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const textResponse = data.candidates[0].content.parts[0].text;
             
-            // Traitement des données
             const processedData = {
                 name: extractInfoFromNumberedList(textResponse, 1) || "Information non disponible",
                 laboratory: extractInfoFromNumberedList(textResponse, 2) || "Information non disponible",
@@ -239,7 +193,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 expiry: extractInfoFromNumberedList(textResponse, 19) || "Information non disponible"
             };
 
-            // Mise à jour du statut
             statusMessage.classList.remove('loading-dots');
             statusMessage.textContent = 'Scan terminé';
             const checkmark = document.createElement('span');
@@ -248,7 +201,6 @@ document.addEventListener('DOMContentLoaded', () => {
             statusMessage.appendChild(checkmark);
             statusMessage.classList.add('success');
 
-            // Affichage des résultats
             displayResults(processedData);
             resultTable.hidden = false;
 
@@ -273,20 +225,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Fonction de gestion des erreurs
-    function handleError(error) {
-        console.error('Erreur détaillée:', error);
-        statusMessage.classList.remove('loading-dots');
-        statusMessage.textContent = 'Une erreur est survenue';
-        statusMessage.classList.add('error');
-    }
-
-    // Ajout d'un gestionnaire d'erreurs global
-    window.onerror = function(msg, url, lineNo, columnNo, error) {
-        console.error('Erreur globale:', {msg, url, lineNo, columnNo, error});
-        return false;
-    };
-
     function displayResults(data) {
         const generalInfo = document.getElementById('generalInfo');
         const medicalInfo = document.getElementById('medicalInfo');
@@ -294,7 +232,6 @@ document.addEventListener('DOMContentLoaded', () => {
         generalInfo.innerHTML = '';
         medicalInfo.innerHTML = '';
         
-        // Informations générales
         const generalInfos = {
             'Nom commercial': data.name,
             'Laboratoire': data.laboratory,
@@ -307,7 +244,6 @@ document.addEventListener('DOMContentLoaded', () => {
             'Statut': data.status
         };
 
-        // Informations médicales
         const medicalInfos = {
             'Classe thérapeutique': data.category,
             'Indications principales': data.mainUse,
@@ -321,7 +257,6 @@ document.addEventListener('DOMContentLoaded', () => {
             'Surveillance particulière': data.monitoring
         };
 
-        // Fonction pour créer les lignes du tableau
         const createTableRows = (infoObj, tableBody) => {
             for (const [key, value] of Object.entries(infoObj)) {
                 if (value && value !== "Information non disponible") {
@@ -352,30 +287,5 @@ document.addEventListener('DOMContentLoaded', () => {
             reader.onerror = reject;
             reader.readAsDataURL(file);
         });
-    }
-
-    // Gestion des gestes tactiles
-    let touchStartY = 0;
-    let touchEndY = 0;
-
-    document.addEventListener('touchstart', e => {
-        touchStartY = e.changedTouches[0].screenY;
-    });
-
-    document.addEventListener('touchend', e => {
-        touchEndY = e.changedTouches[0].screenY;
-        handleSwipeGesture();
-    });
-
-    function handleSwipeGesture() {
-        const swipeDistance = touchEndY - touchStartY;
-        if (Math.abs(swipeDistance) > 50) {
-            // Gestion du swipe
-            if (swipeDistance > 0) {
-                // Swipe vers le bas
-            } else {
-                // Swipe vers le haut
-            }
-        }
     }
 }); 
