@@ -10,25 +10,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultTable = document.getElementById('resultTable');
 
     uploadBtn.addEventListener('click', () => {
+        fileInput.removeAttribute('capture');
         fileInput.click();
     });
 
-    fileInput.addEventListener('change', handleImageUpload);
-    captureBtn.addEventListener('click', startCamera);
+    captureBtn.addEventListener('click', () => {
+        fileInput.setAttribute('capture', 'environment');
+        fileInput.click();
+    });
 
-    // Fonction de sanitisation des données
-    function sanitizeData(data) {
-        const clean = {};
-        for (let key in data) {
-            clean[key] = typeof data[key] === 'string' 
-                ? data[key].replace(/[<>]/g, '') 
-                : data[key];
-        }
-        return clean;
-    }
-
-    // Gestion de l'upload d'image
-    async function handleImageUpload(e) {
+    fileInput.addEventListener('change', async (e) => {
         try {
             const file = e.target.files[0];
             if (file) {
@@ -41,6 +32,17 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Erreur:', error);
             alert(error.message);
         }
+    });
+
+    // Fonction de sanitisation des données
+    function sanitizeData(data) {
+        const clean = {};
+        for (let key in data) {
+            clean[key] = typeof data[key] === 'string' 
+                ? data[key].replace(/[<>]/g, '') 
+                : data[key];
+        }
+        return clean;
     }
 
     // Gestion de la caméra

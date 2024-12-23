@@ -20,6 +20,10 @@
         {
           "key": "Feature-Policy",
           "value": "camera 'self'"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
         }
       ]
     }
